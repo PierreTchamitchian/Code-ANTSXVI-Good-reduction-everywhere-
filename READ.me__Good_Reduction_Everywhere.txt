@@ -111,3 +111,4 @@ One can argue that it assumes that the Mestre bound is a function in lambda with
 Finally, we called the four listof datas build with this algorithm to have them registered. I can of course just stock them in a text fiel, but I just did not think of that when coding, as I lack experience in the field (of coding).
 The number of field where there cannot be good reduction everywhere can be found easily from these lists, since I just have count the fields where the compute bound is greater than 1.
 
+The file "Algorithm to have the subfields.ipynb" contains the algorithm used to find the subfields of the fields with no abelian varieties everywhere. The only difficulty was to be sure not to count them more than once.
