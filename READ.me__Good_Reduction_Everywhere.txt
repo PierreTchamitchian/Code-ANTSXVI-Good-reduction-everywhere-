@@ -1,0 +1,113 @@
+Here are the needed explanations for the code computing the bounds over number fields.
+There are a lot of functions irrelevant to the paper in the posted code, as I decided not to alter anything when posing it. Several algorithm compute essentially the same quantities, with slight changes in the output/input between the variations. Some where not used, some are for work in progress.
+The main computations for the lower bounds on number fields where made with the function minorant_conducteur_lambda_nbfield():
+
+	lam is lambda, MesF the Mestre test function, rk the rank of the elliptic curves (always zero here), K a number field:
+def minorant_conducteur_lambda_nbfield(lam,MesF,rk,K):         
+    n = K.absolute_degree()
+    disc = K.absolute_discriminant()
+    lowbound = lam * rk * Value_Phi_0(MesF) + n * Mlambda2(lam,MesF) - Mestre_somme_lambda_nbfield(lam,MesF,K)
+    return exp(lowbound)/(disc^2)
+
+This computes the expression give at in Theorem 4.3 in the paper.
+The term      lam * rk * Value_Phi_0(MesF) is alway taken with r=0, hence the reason why it does not appear on theoritical formula.
+The term      - Mestre_somme_lambda_nbfield(lam,MesF,K) computes the sum:
+
+def Mestre_somme_lambda_nbfield(lam,MesF,K):               
+    Liste = liste_premier_lambda(lam)
+    Somme = 0
+    for p in Liste:
+        for pp in K.primes_above(p):
+            fnu = pp.residue_class_degree()
+            Somme += (somme_premier_degre_ramifi(p,lam,MesF,fnu)).numerical_approx()
+    return 2 * Somme 
+
+Note, in the final expression returned, the factor 2 that appears in the theoritical formula. This algorithm first builds the list of primes that can appear in the sum (a finite sum, with only primes lower than exp(lambda)).
+For each prime p in this list, it calculates the corresponding sum over all primes above p in the number fields K, using the function  somme_premier_degre_ramifi(p,lam,MesF,fnu)
+
+	fnu is the inertia degree of the  prime above p in K.
+def somme_premier_degre_ramifi(p,lam,MesF,fnu):                                                      
+    q = p^fnu                                                                #q is the norm of the prime
+    S,m,x = 0,1,q                                                                                 
+    while x<= exp(lam):                                                      
+        S += (floor(2*sqrt(x)) * x^(-1) * MesF(m*math.log(q)/lam.numerical_approx())).numerical_approx()              #the expression that you see in the theoritical sum is used here.
+        x *=  q
+        m +=  1
+    return numerical_approx(log(q)*S)
+
+The while loop is used to make the computations fastr by not computing the powers of p each time. Not using numerical_approx() leads to much longer computations.
+The term Mlambda2(lam,MesF) computes the integral term noted M_{\lambda,F} in the paper:
+
+def Mlambda2(lam,MesF):
+    aux(x) = MesF(x) * exp(-lam*x)/(1-exp(-lam*x)) - MesF(0) * exp(-lam*x)/(lam*x)
+    a = numerical_integral(aux(x),0,1)[0]
+    b = numerical_integral(exp(-x)/x, lam.numerical_approx() , Infinity )[0] 
+    return 2*(lam*a - MesF(0)*b) +   MesF(0)*Constant_Mlambda       
+
+Note again the factor two present in the output, as it is contained in the definition of the integral term (see Proposition 3.2, p.11).
+
+When making the computations, we called the following:
+
+f = open("deg 12 fields.sage","r")
+deg = 12
+
+def liste_file():
+    listeofthefields = []
+    for s in f.readlines():
+        if s[0] =="[" :
+            string_poly =  s.split('[')[2].split(']')[0]
+            poly = [ ZZ(n) for n in string_poly.split(", ")]
+            listeofthefields += [poly]
+    return listeofthefields
+
+poly_fields = liste_file()
+
+ZZx.<x> = ZZ[]
+Liste_lambda_discri  = []
+Liste_lambda_bounds  = []
+Liste_discri_bounds  = []
+Liste_field_bounds   = []
+for coefficients in poly_fields:
+    poly = ZZx(coefficients)
+    J.<a> = NumberField(poly)
+    rootdisc = float(abs(J.absolute_discriminant())^(1/deg))
+    optlam = optimi_lam1(Mes,0,J)
+    low_bound = minorant_conducteur_lambda_nbfield(optlam,Mes,0,J)^(1/deg)
+    Liste_field_bounds  += [(poly,low_bound)]
+    Liste_discri_bounds += [(rootdisc,low_bound)]
+    Liste_lambda_bounds += [(optlam,low_bound)]
+    Liste_lambda_discri += [(rootdisc,optlam)]
+    print(rootdisc)
+
+The file "deg 12 fields.sage" is provided in the Github page. It was dowloaded on the LMFDB, by taking fields of root_discriminant lower than the bound of proposition 4.8.
+We baically call the function minorant_conducteur_lambda_nbfield for every fields appearing in the list and register the datas in different lists. The onlt thing that need an explanation is the use of 
+optimi_lam1:
+
+
+def optimi_lam1(MesF,rk,K):
+    earlylam = 1
+    earlyval = minorant_conducteur_lambda_nbfield(earlylam,MesF,rk,K) 
+    while minorant_conducteur_lambda_nbfield(earlylam + 1,MesF,rk,K) > earlyval:
+        earlyval = minorant_conducteur_lambda_nbfield(earlylam + 1,MesF,rk,K)
+        earlylam = earlylam + 1
+    midlam = earlylam-0.9
+    midval = minorant_conducteur_lambda_nbfield(midlam,MesF,rk,K)
+    while minorant_conducteur_lambda_nbfield(midlam + 0.1,MesF,rk,K) > midval:
+        midval = minorant_conducteur_lambda_nbfield(midlam + 0.1,MesF,rk,K)
+        midlam = midlam + 0.1
+    finlam = midlam-0.09
+    finval = minorant_conducteur_lambda_nbfield(finlam,MesF,rk,K)
+    while minorant_conducteur_lambda_nbfield(finlam+0.01,MesF,rk,K) > finval:
+        finval = minorant_conducteur_lambda_nbfield(finlam+0.01,MesF,rk,K)
+        finlam += 0.01
+    return (finlam)
+
+This algorithm computes the bound for a certain parameter lambda, initially 1, then for lambda+1 and keeps on going until the bound is maximal,a nd register the last parameter found, called earlylam.
+Then it does the same with an increment of 0.1 and initial parameter earlylam-1. The registered parameter in the end is midlam
+Then it does the same with an increment of 0.1, with initial parameter midlam-0.1. The returned parameter finlam is the optimal lambda found with a margin of 0.01.
+One can argue that it assumes that the Mestre bound is a function in lambda with no local maximum besides its global maximum, which seems to be the case. I fo not claim in the paper that I found the best lambda possible, except in Example 4.6. But specific computations just for this field showed it is the case (on can print the graph of minorant_conducteur_lambda_nbfield(lam,MesF,rk,K) as a function of lambda for all lambdas and verify this).
+
+
+Finally, we called the four listof datas build with this algorithm to have them registered. I can of course just stock them in a text fiel, but I just did not think of that when coding, as I lack experience in the field (of coding).
+The number of field where there cannot be good reduction everywhere can be found easily from these lists, since I just have count the fields where the compute bound is greater than 1.
+

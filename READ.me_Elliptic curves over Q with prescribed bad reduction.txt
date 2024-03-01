@@ -1,0 +1,91 @@
+
+Here are the needed explnations for the results concerning elliptic curves over Q with prescribed bad reduction. 
+The computations can be found in the file "New tests for diverse rank.ipynb".
+
+The main function is minorant_conducteur_lambda_withbadprimes:
+	
+	lam is lambda, MesF a Mestre test funciton, rk the assumed rank of an elliptic curve, mult_badprimes the list of primes assumed to be a multiplicative reduction (split or non-split), add_badprimes the list of primes assumed with 	additive reduction. The outuput is the lower bound of the conductor of an elliptic curves with these properties, computed with formula of Theorem 3.4.
+def minorant_conducteur_lambda_withbadprimes(lam,MesF,rk,mult_badprimes,add_badprimes): #knowing some primes of add and mul reduction
+    K = lam * rk *Value_Phi_0(MesF) + Mlambda2(lam,MesF)-Mestre_somme_withbadprimes_lambda(lam,MesF,mult_badprimes,add_badprimes)
+    return exp(K)
+
+The term lam * rk *Value_Phi_0(MesF) correspond to the first term in the lower bound, noted lambda r \Phi(1/2). By the definition of \Phi, it is simply the integral of the Mestre test function multiplied by the correct factors:
+
+def Value_Phi_0(MesF):      
+    return 2*numerical_integral(MesF(x),0,1)[0]
+Note that we always assume the function as compact support in [-1,1] and is even, hence the factor 2 in the output.
+
+The term Mlambda2(lam,MesF) straightforwardly computes the integral term noted M_{\lambda,F} in the paper:
+
+def Mlambda2(lam,MesF):
+    aux(x) = MesF(x) * exp(-lam*x)/(1-exp(-lam*x)) - MesF(0) * exp(-lam*x)/(lam*x)
+    a = numerical_integral(aux(x),0,1)[0]
+    b = numerical_integral(exp(-x)/x, lam.numerical_approx() , Infinity )[0] 
+    return 2*(lam*a - MesF(0)*b) +   MesF(0)*Constant_Mlambda       
+
+Note again the factor two present in the output, as it is contained in the definition of the integral term (see Proposition 3.2, p.11).
+
+The function Mestre_somme_withbadprimes_lambda(lam,MesF,mult_badprimes,add_badprimes) is defined as followed:
+
+def Mestre_somme_withbadprimes_lambda(lam,MesF,mult_badprimes,add_badprimes): #Global sum with mult and add reductions
+    Liste = liste_premier_lambda(lam)                                              
+    Somme = 0
+    for pri in Liste:                                                  
+        if pri in mult_badprimes :                               #Correct sum for multiplicative red
+            Somme += somme_mult_badprimes_lambda(pri,lam,MesF)
+        elif pri in add_badprimes: 
+            Somme += 0                                      #Do nothing for additive reduction
+        else:
+            Somme += Mestre_somme_premier_lambda(pri,lam,MesF)   # In case of good reduction
+    return 2*Somme 
+
+The "Liste" is the list of primes lower than exp(lambda) that we need to compute the sum. For each primes, we check if it is of multiplicative reduction, where in this case we compute the corresponding sum somme_mult_badprimes_lambda:
+
+def somme_mult_badprimes_lambda(p,lam,MesF):                      
+    S = p^(-1)*MesF(math.log(p)/lam.numerical_approx())
+    m = 2
+    x = p^2
+    while x <= exp(lam):
+        S = ( S +   (   x^(-1)*MesF(m*math.log(p)/lam.numerical_approx()) ).abs()  ).numerical_approx()
+        x = p * x
+        m = m+1
+    return numerical_approx(log(p)*S),
+or of additive reduction, where then the term is 0 and we do nothing. If it is of good reduction, the corresponding sum is Mestre_somme_premier_lambda:
+
+
+def Mestre_somme_premier_lambda(p,lam,MesF):               
+    S,m,x = 0,1,p                                       
+    while x<= exp(lam):
+        S += ((floor(2*sqrt(x)) * x^(-1) * MesF(m*math.log(p)/lam.numerical_approx())).abs()).numerical_approx()
+        x *= x
+        m += 1
+    return numerical_approx(log(p)*S)
+
+Notice the difference with somme_mult_badprimes_lambda: the factor "floor(2*sqrt(x))", present in the formula of Theorem 3.4 for the good primes but not for the bad primes. One can check that "x" is the correct term. We choose to use an increment to not compute the powers of p each time, gaining computation time.
+
+
+The results are then produced using the following:
+
+	rang is the rank , liste_lam is a list of lambdas, dict_function is a dictionnary of Mestre test function. In practive we  only use one test function.
+	mauvaispremiers1 is the liste of multiplicative bad primes, mauvaispremiers2 the list of additive bad primes.
+def tableaucomparatif_mauvaispremiers(rang,liste_lam,dict_fonction,mauvaispremiers1,mauvaispremiers2):
+    tableau=[]
+    for k in dict_fonction.keys():
+        F=dict_fonction[k]
+        lambda_opti=0
+        minorant_opti=0
+        for lam in liste_lam:
+            tyme = cputime()
+            m = minorant_conducteur_lambda_withbadprimes(lam,F,rang,mauvaispremiers1,mauvaispremiers2)
+            comptime=str(cputime(tyme))[:8]
+            if  m > minorant_opti:
+                lambda_opti = lam
+                minorant_opti = m
+        tableau=tableau+[((rang,mauvaispremiers1,mauvaispremiers2),k,lambda_opti.n(12),round(minorant_opti,ndigits=3),comptime,"TBA4","TBA5","TBA6")]   
+    return latex(table(tableau, header_row=["rank and reduction", "test function","lambda","Mestre bound","computation time","real bound","prooved","source"], frame=True))
+
+It basically return "minorant_opti" which is the greatest bound found by comparing all the bounds for all lambda in liste_lam. It returns the other infos in a way that allows me to easily write table in latex. 
+
+Any result tha you find for this part of the article can then be found in the file (I suggest you make a research of the associated computation time).
+
+
